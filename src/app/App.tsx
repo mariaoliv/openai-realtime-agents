@@ -24,6 +24,7 @@ import { createRealtimeConnection } from "./lib/realtimeConnection";
 
 // Agent configs
 import { allAgentSets, defaultAgentSetKey } from "@/app/agentConfigs";
+import { send } from "process";
 
 function App() {
   const searchParams = useSearchParams();
@@ -402,6 +403,10 @@ function App() {
   }, [isAudioPlaybackEnabled]);
 
   const agentSetKey = searchParams.get("agentConfig") || "default";
+
+  sendClientEvent({ type: "session.create" }, "trigger session create");
+
+  // sendClientEvent({ type: "session.update", "instructions" : "Speak at 10 words per minute" }, "trigger session update");
 
   return (
     <div className="text-base flex flex-col h-screen bg-gray-100 text-gray-800 relative">
