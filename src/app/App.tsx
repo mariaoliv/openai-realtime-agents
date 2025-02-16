@@ -404,10 +404,6 @@ function App() {
 
   const agentSetKey = searchParams.get("agentConfig") || "default";
 
-  sendClientEvent({ type: "session.create" }, "trigger session create");
-
-  // sendClientEvent({ type: "session.update", "instructions" : "Speak at 10 words per minute" }, "trigger session update");
-
   return (
     <div className="text-base flex flex-col h-screen bg-gray-100 text-gray-800 relative">
       <div className="p-5 text-lg font-semibold flex justify-between items-center">
