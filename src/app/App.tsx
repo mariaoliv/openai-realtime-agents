@@ -24,6 +24,7 @@ import { createRealtimeConnection } from "./lib/realtimeConnection";
 
 // Agent configs
 import { allAgentSets, defaultAgentSetKey } from "@/app/agentConfigs";
+import LiveVoiceVisualizer from "./components/Animations";
 
 function App() {
   const searchParams = useSearchParams();
@@ -497,6 +498,7 @@ function App() {
         <Events isExpanded={isEventsPaneExpanded} />
       </div>
 
+      <LiveVoiceVisualizer />
       <BottomToolbar
         sessionStatus={sessionStatus}
         onToggleConnection={onToggleConnection}
