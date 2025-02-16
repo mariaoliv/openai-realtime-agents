@@ -41,6 +41,17 @@ function App() {
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const dcRef = useRef<RTCDataChannel | null>(null);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    if (!audioElementRef.current) {
+      // Create the audio element if it doesn't exist
+      const audioElement = document.createElement("audio");
+      audioElement.autoplay = true; // or false, depending on your needs
+      audioElementRef.current = audioElement;
+      document.body.appendChild(audioElement); // Append to the DOM if needed
+    }
+  }, []);
+
   const [sessionStatus, setSessionStatus] =
     useState<SessionStatus>("DISCONNECTED");
 
@@ -498,7 +509,11 @@ function App() {
         <Events isExpanded={isEventsPaneExpanded} />
       </div>
 
-      <LiveVoiceVisualizer />
+    {/* Only render component if the audio element is ready */}
+    {audioElementRef.current && (
+      <LiveVoiceVisualizer audioElementRef={audioElementRef} />
+    )}
+
       <BottomToolbar
         sessionStatus={sessionStatus}
         onToggleConnection={onToggleConnection}

@@ -1,79 +1,102 @@
 import { useEffect, useRef, useState } from "react";
 
-export default function LiveVoiceVisualizer() {
-  const audioRef = useRef<MediaStreamAudioSourceNode | null>(null);
+interface LiveVoiceVisualizerProps {
+  audioElementRef: React.RefObject<HTMLAudioElement>;
+}
+
+export default function LiveVoiceVisualizer({ audioElementRef }: LiveVoiceVisualizerProps) {
+  const audioRef = useRef<MediaElementAudioSourceNode | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isBlinking, setIsBlinking] = useState(false);
 
   useEffect(() => {
-    const startMicrophone = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const analyser = audioCtx.createAnalyser();
-        const source = audioCtx.createMediaStreamSource(stream);
+    if (!audioElementRef.current) return;
 
-        source.connect(analyser);
-        analyser.fftSize = 64;
-        audioRef.current = source;
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 64;
 
-        const bufferLength = analyser.frequencyBinCount;
-        const dataArray = new Uint8Array(bufferLength);
+    const source = audioCtx.createMediaElementSource(audioElementRef.current);
+    source.connect(analyser);
+    analyser.connect(audioCtx.destination);
+    audioRef.current = source;
 
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
+    const bufferLength = analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
 
-        function draw() {
-          requestAnimationFrame(draw);
-          analyser.getByteFrequencyData(dataArray);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
 
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          ctx.fillStyle = "#0af";
+    function draw() {
+      requestAnimationFrame(draw);
+      analyser.getByteFrequencyData(dataArray);
 
-          const barWidth = canvas.width / bufferLength;
-          dataArray.forEach((value, i) => {
-            const barHeight = value / 2;
-            ctx.fillRect(i * barWidth, canvas.height - barHeight, barWidth - 2, barHeight);
-          });
-        }
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        draw();
-      } catch (error) {
-        console.error("Error accessing microphone:", error);
+      const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
+      gradient.addColorStop(0, "#ff0000");
+      gradient.addColorStop(0.5, "#00ff00");
+      gradient.addColorStop(1, "#0000ff");
+      ctx.fillStyle = gradient;
+
+      const barWidth = canvas.width / (bufferLength * 2);
+      const centerX = canvas.width / 2;
+      const maxBarHeight = canvas.height / 2;
+      const linearScalingFactor = 0.8;
+      const nonLinearFactor = 0.5;
+
+      dataArray.forEach((value, i) => {
+        const linearScaledValue = value * linearScalingFactor;
+        const nonLinearScaledValue = Math.pow(value / 255, nonLinearFactor) * 255;
+        const combinedValue = (linearScaledValue + nonLinearScaledValue) / 2;
+        const barHeight = (combinedValue / 255) * maxBarHeight;
+
+        ctx.fillRect(centerX - (i * barWidth), canvas.height / 2 - barHeight, barWidth - 1, barHeight);
+        ctx.fillRect(centerX - (i * barWidth), canvas.height / 2, barWidth - 1, barHeight);
+
+        ctx.fillRect(centerX + (i * barWidth), canvas.height / 2 - barHeight, barWidth - 1, barHeight);
+        ctx.fillRect(centerX + (i * barWidth), canvas.height / 2, barWidth - 1, barHeight);
+      });
+
+      const maxAmplitude = Math.max(...dataArray);
+      if (maxAmplitude > 128) {
+        setIsBlinking(true);
+        setTimeout(() => setIsBlinking(false), 150);
       }
-    };
+    }
 
-    startMicrophone();
+    draw();
 
     return () => {
-      if (audioRef.current) {
-        audioRef.current.disconnect();
-      }
+      source.disconnect();
+      analyser.disconnect();
     };
-  }, []);
-
-  // Randomized Blinking Effect
-  useEffect(() => {
-    const blinkInterval = setInterval(() => {
-      setIsBlinking(true);
-      setTimeout(() => setIsBlinking(false), 150);
-    }, Math.random() * 4000 + 2000);
-
-    return () => clearInterval(blinkInterval);
-  }, []);
+  }, [audioElementRef]);
 
   return (
     <div className="flex flex-col items-center gap-2">
-      {/* Eyes */}
       <div className="flex gap-4">
-        <div className={`w-6 h-3 bg-black rounded-full transition-all ${isBlinking ? "h-1" : ""}`} />
-        <div className={`w-6 h-3 bg-black rounded-full transition-all ${isBlinking ? "h-1" : ""}`} />
+        <div className={`eye ${isBlinking ? "blink" : ""}`} />
+        <div className={`eye ${isBlinking ? "blink" : ""}`} />
       </div>
 
-      {/* Voice Visualization */}
       <canvas ref={canvasRef} width={300} height={100} className="bg-gray-800 rounded-md" />
+
+      <style jsx>{`
+        .eye {
+          width: 20px;
+          height: 20px;
+          background-color: #000;
+          border-radius: 50%;
+          border: 2px solid #fff;
+          transition: height 0.1s ease;
+        }
+        .blink {
+          height: 4px;
+        }
+      `}</style>
     </div>
   );
 }
