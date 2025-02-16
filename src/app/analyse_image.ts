@@ -40,4 +40,3 @@ export const analyzeImage = async (base64Image: string): Promise<string> => {
     // console.log(response.choices[0].message.content);
     return response.choices[0].message.content ?? '';
   };
-  \

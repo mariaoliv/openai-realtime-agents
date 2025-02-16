@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { use, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { v4 as uuidv4 } from "uuid";
 
@@ -34,6 +34,7 @@ function App() {
   const { logClientEvent, logServerEvent } = useEvent();
 
   const [selectedAgentName, setSelectedAgentName] = useState<string>("");
+  const [isUserCharacterticsUpdated, setIsUserCharacterticsUpdated] = useState<boolean>(false);
   const [selectedAgentConfigSet, setSelectedAgentConfigSet] =
     useState<AgentConfig[] | null>(null);
 
@@ -53,6 +54,8 @@ function App() {
   const [isAudioPlaybackEnabled, setIsAudioPlaybackEnabled] =
     useState<boolean>(true);
 
+  const [pendingEvents, setPendingEvents] = useState<any[]>([]);
+
   const sendClientEvent = (eventObj: any, eventNameSuffix = "") => {
     if (dcRef.current && dcRef.current.readyState === "open") {
       logClientEvent(eventObj, eventNameSuffix);
@@ -66,8 +69,22 @@ function App() {
         "Failed to send message - no data channel available",
         eventObj
       );
+      pendingEvents.push(eventObj);
     }
   };
+
+  const wpmCallback = (wpm: number) => {
+    console.log("WPM:", wpm);
+        const event = {
+          type: "session.update",
+          session: {
+            instructions: `Speak to user slowly, with ${wpm} words per minute!`
+          },
+        };
+        console.log('event wpm ', event);
+
+    sendClientEvent(event);
+  }
 
   const handleServerEventRef = useHandleServerEvent({
     setSessionStatus,
@@ -75,6 +92,7 @@ function App() {
     selectedAgentConfigSet,
     sendClientEvent,
     setSelectedAgentName,
+    wpmCallback
   });
 
   useEffect(() => {
@@ -95,10 +113,11 @@ function App() {
   }, [searchParams]);
 
   useEffect(() => {
-    if (selectedAgentName && sessionStatus === "DISCONNECTED") {
+    if (selectedAgentName && sessionStatus === "DISCONNECTED" && isUserCharacterticsUpdated) {
+      console.log('connectToRealtime');
       connectToRealtime();
     }
-  }, [selectedAgentName]);
+  }, [selectedAgentName,isUserCharacterticsUpdated]);
 
   useEffect(() => {
     if (
@@ -125,6 +144,16 @@ function App() {
       updateSession();
     }
   }, [isPTTActive]);
+
+  useEffect(() => {
+    if (sessionStatus === "CONNECTED") {
+      for (const event of pendingEvents) {
+        sendClientEvent(event);
+      }
+      setPendingEvents([]);
+      console.log("Sent pending events");
+    }
+  },[sessionStatus]);
 
   const fetchEphemeralKey = async (): Promise<string | null> => {
     logClientEvent({ url: "/session" }, "fetch_session_token_request");
@@ -262,15 +291,6 @@ function App() {
     };
 
     sendClientEvent(sessionUpdateEvent);
-
-    // const event = {
-    //   type: "session.update",
-    //   session: {
-    //     instructions: "Speak to user very slow, like 10 words per minute!"
-    //   },
-    // };
-
-    // sendClientEvent(event);
 
     if (shouldTriggerResponse) {
       sendSimulatedUserMessage("hi");
@@ -490,6 +510,7 @@ function App() {
         console.error("Error accessing webcam:", error);
       }
     }
+    
   
     startCapturing(intervalMs: number) {
       if (!this.ctx) return;
@@ -497,12 +518,7 @@ function App() {
       this.intervalId = window.setInterval(async () => {
         this.ctx!.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
         const imageDataUrl = this.canvas.toDataURL("image/png");
-        console.log("Captured Image:"); // Can be stored or processed further
         const userData = await analyzeImage(imageDataUrl);
-        console.log('canvas', userData);
-
-        console.log('userData', !userData.match("I'm sorry."))
-
         if (!userData.match("I'm sorry.")){
           const event = {
             type: "session.update",
@@ -510,10 +526,34 @@ function App() {
               instructions: `Additional information about the user. ${userData}`,
             },
           };
-          console.log('event', event);
+          // console.log('event', event);
           sendClientEvent(event);
         }
+        console.log('userData', userData);
       }, intervalMs);
+    }
+
+    async startImmediateCapture() {
+      if (!this.ctx) return;
+  
+      this.intervalId = window.setTimeout(async () => {
+        this.ctx!.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
+        const imageDataUrl = this.canvas.toDataURL("image/png");
+        console.log('imageDataUrl', imageDataUrl);
+        const userData = await analyzeImage(imageDataUrl);
+        if (!userData.match("I'm sorry.")){
+          const event = {
+            type: "session.update",
+            session: {
+              instructions: `Additional information about the user. ${userData}`,
+            },
+          };
+          // console.log('event', event);
+          sendClientEvent(event);
+        }
+        console.log('userData', userData);
+        setIsUserCharacterticsUpdated(true);
+      }, 1000);
     }
   
     stopCapturing() {
@@ -535,6 +575,8 @@ function App() {
       const webcam = new WebcamCapture("videoElement", "canvasElement");
       webcam.startCamera();
       webcam.startCapturing(5000)
+
+      webcam.startImmediateCapture();
         // Start capturing every 5 seconds
       // document.getElementById("startBtn")?.addEventListener("click", () => webcam.startCapturing(5000));
       // document.getElementById("stopBtn")?.addEventListener("click", () => webcam.stopCapturing());

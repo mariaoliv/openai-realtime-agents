@@ -12,7 +12,15 @@ export interface UseHandleServerEventParams {
   sendClientEvent: (eventObj: any, eventNameSuffix?: string) => void;
   setSelectedAgentName: (name: string) => void;
   shouldForceResponse?: boolean;
+  wpmCallback: (wpm: number) => void;
 }
+
+
+var timestarted = Date.now();
+var timeEnded = Date.now();
+var time_ai_started = Date.now();
+var time_ai_ended = Date.now();
+var wpm_array:number[] = [];
 
 export function useHandleServerEvent({
   setSessionStatus,
@@ -20,6 +28,7 @@ export function useHandleServerEvent({
   selectedAgentConfigSet,
   sendClientEvent,
   setSelectedAgentName,
+  wpmCallback,
 }: UseHandleServerEventParams) {
   const {
     transcriptItems,
@@ -104,6 +113,7 @@ export function useHandleServerEvent({
 
   const handleServerEvent = (serverEvent: ServerEvent) => {
     logServerEvent(serverEvent);
+    // console.log(serverEvent.type);
 
     switch (serverEvent.type) {
       case "session.created": {
@@ -148,6 +158,17 @@ export function useHandleServerEvent({
         if (itemId) {
           updateTranscriptMessage(itemId, finalTranscript, false);
         }
+
+        const time_passed = timeEnded - timestarted;
+        const num_words = finalTranscript.split(/\s/).length - 1;
+        const wpm = Math.floor((num_words / time_passed) * 60000);
+        console.log(`[input_audio_transcription.completed] USER time_passed=${time_passed}, num_words=${num_words}, wpm=${wpm}`);
+        if (wpm > 0) {
+          wpm_array.push(wpm);
+          const average = Math.floor(wpm_array.reduce((a, b) => a + b) / wpm_array.length);
+          console.log('WPM array',wpm_array,'Average WPM',average);
+          wpmCallback(average);
+        }
         break;
       }
 
@@ -176,6 +197,32 @@ export function useHandleServerEvent({
             }
           });
         }
+        break;
+      }
+
+      case 'input_audio_buffer.cleared':{
+        timestarted = Date.now();
+        console.log('USER speech started',Date.now(),'timestamp',timestarted);
+        break;
+      }
+
+      case 'input_audio_buffer.committed':{
+        timeEnded = Date.now();
+        const diff = timeEnded - timestarted;
+        break;
+      }
+
+      case 'output_audio_buffer.started':{
+        time_ai_started = Date.now();
+        console.log('AI speech started',Date.now(),'timestamp',time_ai_started);
+        break;
+      }
+
+      case 'output_audio_buffer.stopped':{
+        time_ai_ended = Date.now();
+        const diff = time_ai_ended - time_ai_started;
+        console.log('AI speech ended',Date.now(),'timestamp',time_ai_ended);
+        console.log('AI speech time taken',diff);
         break;
       }
 
