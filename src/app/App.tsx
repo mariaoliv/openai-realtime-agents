@@ -24,6 +24,7 @@ import { createRealtimeConnection } from "./lib/realtimeConnection";
 
 // Agent configs
 import { allAgentSets, defaultAgentSetKey } from "@/app/agentConfigs";
+import { analyzeImage } from "./analyse_image";
 
 function App() {
   const searchParams = useSearchParams();
@@ -39,6 +40,7 @@ function App() {
   const [dataChannel, setDataChannel] = useState<RTCDataChannel | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const dcRef = useRef<RTCDataChannel | null>(null);
+  const canvas = useRef<HTMLCanvasElement | null>(null);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
   const [sessionStatus, setSessionStatus] =
     useState<SessionStatus>("DISCONNECTED");
@@ -261,6 +263,15 @@ function App() {
 
     sendClientEvent(sessionUpdateEvent);
 
+    // const event = {
+    //   type: "session.update",
+    //   session: {
+    //     instructions: "Speak to user very slow, like 10 words per minute!"
+    //   },
+    // };
+
+    // sendClientEvent(event);
+
     if (shouldTriggerResponse) {
       sendSimulatedUserMessage("hi");
     }
@@ -403,6 +414,144 @@ function App() {
 
   const agentSetKey = searchParams.get("agentConfig") || "default";
 
+  class CameraPermissionHandler {
+    private videoElement: HTMLVideoElement;
+  
+    constructor(videoId: string) {
+      this.videoElement = document.getElementById(videoId) as HTMLVideoElement;
+    }
+  
+    async checkAndRequestPermission(): Promise<boolean> {
+      try {
+        const permissionStatus = await navigator.permissions.query({ name: "camera" as PermissionName });
+  
+        if (permissionStatus.state === "granted") {
+          console.log("Camera permission already granted.");
+          return true;
+        } else if (permissionStatus.state === "prompt") {
+          console.log("Camera permission needs to be requested.");
+          return this.requestCameraAccess();
+        } else {
+          console.warn("Camera permission denied.");
+          return false;
+        }
+      } catch (error) {
+        console.error("Permissions API not supported, requesting camera access directly.");
+        return this.requestCameraAccess();
+      }
+    }
+  
+    private async requestCameraAccess(): Promise<boolean> {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        this.videoElement.srcObject = stream;
+        this.videoElement.play();
+        console.log("Camera access granted.");
+        return true;
+      } catch (error) {
+        console.error("Error accessing camera:", error);
+        return false;
+      }
+    }
+  }
+  
+  // Usage
+  const cameraHandler = new CameraPermissionHandler("videoElement");
+  
+  document.getElementById("startCameraBtn")?.addEventListener("click", async () => {
+    const hasPermission = await cameraHandler.checkAndRequestPermission();
+    if (!hasPermission) {
+      alert("Camera access is required to use this feature.");
+    }
+  });
+  
+  
+
+  class WebcamCapture {
+    private video: HTMLVideoElement;
+    private canvas: HTMLCanvasElement;
+    private ctx: CanvasRenderingContext2D | null;
+    private intervalId: number | null = null;
+  
+    constructor(videoId: string, canvasId: string) {
+      this.video = document.getElementById(videoId) as HTMLVideoElement;
+      this.canvas = document.getElementById(canvasId) as HTMLCanvasElement;
+      console.log('this.canvas', this.canvas);
+      canvas.current = this.canvas;
+      this.ctx = this.canvas.getContext("2d");
+    }
+  
+    async startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        this.video.srcObject = stream;
+        this.video.play();
+      } catch (error) {
+        console.error("Error accessing webcam:", error);
+      }
+    }
+  
+    startCapturing(intervalMs: number) {
+      if (!this.ctx) return;
+  
+      this.intervalId = window.setInterval(async () => {
+        this.ctx!.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
+        const imageDataUrl = this.canvas.toDataURL("image/png");
+        console.log("Captured Image:"); // Can be stored or processed further
+        const userData = await analyzeImage(imageDataUrl);
+        console.log('canvas', userData);
+
+        console.log('userData', !userData.match("I'm sorry."))
+
+        if (!userData.match("I'm sorry.")){
+          const event = {
+            type: "session.update",
+            session: {
+              instructions: `Additional information about the user. ${userData}`,
+            },
+          };
+          console.log('event', event);
+          sendClientEvent(event);
+        }
+      }, intervalMs);
+    }
+  
+    stopCapturing() {
+      if (this.intervalId) {
+        clearInterval(this.intervalId);
+        this.intervalId = null;
+      }
+    }
+  }
+    // const webcam = new WebcamCapture("videoElement", "canvasElement");
+  
+    // document.getElementById("startCameraBtn")?.addEventListener("click", () => webcam.startCamera());
+    // document.getElementById("startCaptureBtn")?.addEventListener("click", () => webcam.startCapturing(1000));
+    // document.getElementById("stopCaptureBtn")?.addEventListener("click", () => webcam.stopCapturing());
+
+
+
+    useEffect(() => {
+      const webcam = new WebcamCapture("videoElement", "canvasElement");
+      webcam.startCamera();
+      webcam.startCapturing(5000)
+        // Start capturing every 5 seconds
+      // document.getElementById("startBtn")?.addEventListener("click", () => webcam.startCapturing(5000));
+      // document.getElementById("stopBtn")?.addEventListener("click", () => webcam.stopCapturing());
+    },[])
+
+  // useEffect(() => {
+  //   const canvas = document.getElementById("canvasElement") as HTMLCanvasElement;
+  //   const ctx = canvas.getContext("2d");
+  //   console.log('ctx', ctx);
+  // },[canvas])
+  
+  // useTimeout(() => {
+  //   console.log('canvas', canvas.current);
+  //   const ctx = canvas.current?.getContext("2d");
+  //   console.log('ctx', ctx);
+  // }
+
   return (
     <div className="text-base flex flex-col h-screen bg-gray-100 text-gray-800 relative">
       <div className="p-5 text-lg font-semibold flex justify-between items-center">
@@ -446,6 +595,14 @@ function App() {
               </svg>
             </div>
           </div>
+
+          <video id="videoElement"  style={{ display: "none" }}></video>
+          <canvas id="canvasElement" width="640" height="480" style={{ display: "none" }}></canvas>
+          {/* <button id="startBtn">Start Capturing</button>
+          <button id="stopBtn">Stop Capturing</button> */}
+
+          {/* <button id="startCameraBtn">Start Camera</button> */}
+
 
           {agentSetKey && (
             <div className="flex items-center ml-6">
