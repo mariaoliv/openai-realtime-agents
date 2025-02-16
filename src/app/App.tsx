@@ -25,6 +25,7 @@ import { createRealtimeConnection } from "./lib/realtimeConnection";
 // Agent configs
 import { allAgentSets, defaultAgentSetKey } from "@/app/agentConfigs";
 import { analyzeImage } from "./analyse_image";
+import { send } from "process";
 
 function App() {
   const searchParams = useSearchParams();
@@ -145,15 +146,16 @@ function App() {
     }
   }, [isPTTActive]);
 
-  // useEffect(() => {
-  //   if (sessionStatus === "CONNECTED") {
-  //     for (const event of pendingEvents) {
-  //       sendClientEvent(event);
-  //     }
-  //     setPendingEvents([]);
-  //     console.log("Sent pending events");
-  //   }
-  // },[sessionStatus]);
+  useEffect(() => {
+    if (sessionStatus === "CONNECTED") {
+      for (const event of pendingEvents) {
+        sendClientEvent(event);
+      }
+      setPendingEvents([]);
+      sendSimulatedUserMessage("complement the user about the outfit");
+      console.log("Sent pending events");
+    }
+  },[sessionStatus]);
 
   const fetchEphemeralKey = async (): Promise<string | null> => {
     logClientEvent({ url: "/session" }, "fetch_session_token_request");
@@ -195,11 +197,11 @@ function App() {
 
       dc.addEventListener("open", () => {
         logClientEvent({}, "data_channel.open");
-        for (const event of pendingEvents) {
-          sendClientEvent(event);
-        }
-        setPendingEvents([]);
-        console.log("Sent pending events");
+        // for (const event of pendingEvents) {
+        //   sendClientEvent(event);
+        // }
+        // setPendingEvents([]);
+        // console.log("Sent pending events");
       });
       dc.addEventListener("close", () => {
         logClientEvent({}, "data_channel.close");
@@ -295,7 +297,20 @@ function App() {
       },
     };
 
+
+
     sendClientEvent(sessionUpdateEvent);
+
+    // const event = {
+    //   type : "session.update",
+    //   session : {
+    //     instructions : 'Each time the user speaks, pay attetion to their pace and determine whether they are speaking at a slow, fast or moderate pace. In your response to the user, match their pace.'
+    //     //instructions : 'Speak to user very slow, like 10 words per second.'
+    //   }
+
+    // }
+
+    // sendClientEvent(event);
 
     if (shouldTriggerResponse) {
       sendSimulatedUserMessage("hi");

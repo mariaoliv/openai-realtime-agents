@@ -4,6 +4,7 @@ import { ServerEvent, SessionStatus, AgentConfig } from "@/app/types";
 import { useTranscript } from "@/app/contexts/TranscriptContext";
 import { useEvent } from "@/app/contexts/EventContext";
 import { useRef } from "react";
+import { time } from "console";
 
 export interface UseHandleServerEventParams {
   setSessionStatus: (status: SessionStatus) => void;
@@ -39,6 +40,12 @@ export function useHandleServerEvent({
   } = useTranscript();
 
   const { logServerEvent } = useEvent();
+
+  var timestamp = Date.now();
+  var timestamp_ai = Date.now();
+
+  var user_wpm = 0;
+  var ai_wpm = 0;
 
   const handleFunctionCall = async (functionCallParams: {
     name: string;
@@ -134,6 +141,16 @@ export function useHandleServerEvent({
           serverEvent.item?.content?.[0]?.transcript ||
           "";
         const role = serverEvent.item?.role as "user" | "assistant";
+
+        if (role === "assistant") {
+          timestamp_ai = Date.now();
+          console.log('ai timestamp',timestamp_ai);
+        }
+        else {
+          timestamp = Date.now();
+          console.log('user timestamp',timestamp);
+        }
+
         const itemId = serverEvent.item?.id;
 
         if (itemId && transcriptItems.some((item) => item.itemId === itemId)) {
@@ -155,6 +172,14 @@ export function useHandleServerEvent({
           !serverEvent.transcript || serverEvent.transcript === "\n"
             ? "[inaudible]"
             : serverEvent.transcript;
+        // addTranscriptBreadcrumb(
+        //   `title: "audio input completed", data`,
+        //   {
+        //     time_passed,
+        //     num_words,
+        //     wpm,
+        //   } 
+        // );
         if (itemId) {
           updateTranscriptMessage(itemId, finalTranscript, false);
         }
@@ -172,6 +197,11 @@ export function useHandleServerEvent({
         break;
       }
 
+      case "input_audio_buffer.commit": {
+        //timestamp = Date.now();
+      }
+
+
       case "response.audio_transcript.delta": {
         const itemId = serverEvent.item_id;
         const deltaText = serverEvent.delta || "";
@@ -181,7 +211,29 @@ export function useHandleServerEvent({
         break;
       }
 
+
+      case "response.audio_transcript.done": {
+        const itemId = serverEvent.item_id;
+        const text = serverEvent.transcript || "";
+        const time_diff = Date.now() - timestamp_ai;
+        const num_words = text.split(/\s/).length;
+        const wpms = (num_words / time_diff) * 6000;
+        ai_wpm = wpms;
+        console.log(`[audio_transcript.done] AI num_words=${num_words}, time_diff=${time_diff}, wpms=${wpms}`);
+
+        if (Math.abs(ai_wpm - user_wpm) > 100) {
+          if (user_wpm > ai_wpm) {
+            console.log('user is faster ', user_wpm, ai_wpm);
+          }
+          else {
+            console.log('ai is faster', user_wpm, ai_wpm);
+          }
+        }
+      }
+
       case "response.done": {
+        const text = serverEvent.item?.content?.[0]?.transcript || "";
+
         if (serverEvent.response?.output) {
           serverEvent.response.output.forEach((outputItem) => {
             if (
@@ -231,6 +283,17 @@ export function useHandleServerEvent({
         if (itemId) {
           updateTranscriptItemStatus(itemId, "DONE");
         }
+        break;
+      }
+
+      case "output_audio_buffer.started": {
+        const itemId = serverEvent.item?.id;
+        if (itemId) {
+          addTranscriptBreadcrumb(`title: "audio input started", data`)
+          updateTranscriptItemStatus(itemId, "IN_PROGRESS");
+        }
+        //timestamp = Date.now();
+        //alert("output_audio_buffer.started");
         break;
       }
 
