@@ -35,6 +35,9 @@ export function useHandleServerEvent({
   var timestamp = Date.now();
   var timestamp_ai = Date.now();
 
+  var user_wpm = 0;
+  var ai_wpm = 0;
+
   const handleFunctionCall = async (functionCallParams: {
     name: string;
     call_id?: string;
@@ -133,10 +136,10 @@ export function useHandleServerEvent({
           timestamp_ai = Date.now();
           console.log('ai timestamp',timestamp_ai);
         }
-        // else {
-        //   timestamp = Date.now();
-        //   console.log('user timestamp',timestamp);
-        // }
+        else {
+          timestamp = Date.now();
+          console.log('user timestamp',timestamp);
+        }
 
         const itemId = serverEvent.item?.id;
 
@@ -163,6 +166,7 @@ export function useHandleServerEvent({
         // console.log('ai timestamp',timestamp);
         const num_words = finalTranscript.split(/\s/).length - 1;
         const wpm = (num_words / time_passed) * 6000;
+        user_wpm = wpm;
         // console.log('num_words', num_words);
         console.log(`[input_audio_transcription.completed] USER time_passed=${time_passed}, num_words=${num_words}, wpm=${wpm}`);
         // addTranscriptBreadcrumb(
@@ -180,7 +184,7 @@ export function useHandleServerEvent({
       }
 
       case "input_audio_buffer.commit": {
-        timestamp = Date.now();
+        //timestamp = Date.now();
       }
 
 
@@ -200,7 +204,17 @@ export function useHandleServerEvent({
         const time_diff = Date.now() - timestamp_ai;
         const num_words = text.split(/\s/).length;
         const wpms = (num_words / time_diff) * 6000;
+        ai_wpm = wpms;
         console.log(`[audio_transcript.done] AI num_words=${num_words}, time_diff=${time_diff}, wpms=${wpms}`);
+
+        if (Math.abs(ai_wpm - user_wpm) > 100) {
+          if (user_wpm > ai_wpm) {
+            console.log('user is faster ', user_wpm, ai_wpm);
+          }
+          else {
+            console.log('ai is faster', user_wpm, ai_wpm);
+          }
+        }
       }
 
       case "response.done": {
