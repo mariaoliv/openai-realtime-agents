@@ -8,6 +8,9 @@ export default function LiveVoiceVisualizer({ audioElementRef }: LiveVoiceVisual
   const audioRef = useRef<MediaElementAudioSourceNode | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isBlinking, setIsBlinking] = useState(false);
+  const [position, setPosition] = useState({ x: 100, y: 100 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragOffset = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
     if (!audioElementRef.current) return;
@@ -75,9 +78,59 @@ export default function LiveVoiceVisualizer({ audioElementRef }: LiveVoiceVisual
     };
   }, [audioElementRef]);
 
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setIsDragging(true);
+    dragOffset.current = {
+      x: e.clientX - position.x,
+      y: e.clientY - position.y,
+    };
+  };
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (isDragging) {
+      setPosition({
+        x: e.clientX - dragOffset.current.x,
+        y: e.clientY - dragOffset.current.y,
+      });
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  useEffect(() => {
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isDragging]);
+
   return (
-    <div className="flex flex-col items-center gap-2">
-      <div className="flex gap-4">
+    <div
+      style={{
+        position: "absolute",
+        top: position.y,
+        left: position.x,
+        cursor: isDragging ? "grabbing" : "grab",
+        backgroundColor: "rgba(255, 255, 255, 0.9)",
+        border: "1px solid #ccc",
+        borderRadius: "8px",
+        padding: "10px",
+        boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)",
+        zIndex: 1000,
+        width: "320px",
+        height: "160px",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "space-between",
+      }}
+      onMouseDown={handleMouseDown}
+    >
+      <div style={{ height: "30px", display: "flex", alignItems: "center", gap: "10px" }}>
         <div className={`eye ${isBlinking ? "blink" : ""}`} />
         <div className={`eye ${isBlinking ? "blink" : ""}`} />
       </div>
