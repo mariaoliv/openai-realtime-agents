@@ -8,7 +8,7 @@ From the given image, your job is to determine the:
 - Emotion (happy/ sad/ normal)
 - Gender (male/ female)
 - Age (approx. age)
-- Clothing (include any details about the color of the clothes/ shoes, if they wear glasses, any brands you may recognize)
+- Clothing and it's color, clothing type and design/pattern in detail (include any details about the color of the clothes/ shoes, if they wear glasses, any brands you may recognize)
 - Body Language (energetic/ tired/ normal)
 - Is the user facing towards the camera or away from the camera?
 - Any other details you may find interesting.
