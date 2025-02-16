@@ -145,15 +145,15 @@ function App() {
     }
   }, [isPTTActive]);
 
-  useEffect(() => {
-    if (sessionStatus === "CONNECTED") {
-      for (const event of pendingEvents) {
-        sendClientEvent(event);
-      }
-      setPendingEvents([]);
-      console.log("Sent pending events");
-    }
-  },[sessionStatus]);
+  // useEffect(() => {
+  //   if (sessionStatus === "CONNECTED") {
+  //     for (const event of pendingEvents) {
+  //       sendClientEvent(event);
+  //     }
+  //     setPendingEvents([]);
+  //     console.log("Sent pending events");
+  //   }
+  // },[sessionStatus]);
 
   const fetchEphemeralKey = async (): Promise<string | null> => {
     logClientEvent({ url: "/session" }, "fetch_session_token_request");
@@ -195,6 +195,11 @@ function App() {
 
       dc.addEventListener("open", () => {
         logClientEvent({}, "data_channel.open");
+        for (const event of pendingEvents) {
+          sendClientEvent(event);
+        }
+        setPendingEvents([]);
+        console.log("Sent pending events");
       });
       dc.addEventListener("close", () => {
         logClientEvent({}, "data_channel.close");

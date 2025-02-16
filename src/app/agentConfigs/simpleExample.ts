@@ -14,7 +14,7 @@ const greeter: AgentConfig = {
   name: "greeter",
   publicDescription: "Agent that greets the user.",
   instructions:
-    "Please greet the user and ask them if they'd like a Haiku. If yes, transfer them to the 'haiku' agent.",
+    "Please greet the user and give him compliment about his shirt, and add specific details about shirt, and ask them if they'd like a Haiku. If yes, transfer them to the 'haiku' agent.",
   tools: [],
   downstreamAgents: [haiku],
 };
