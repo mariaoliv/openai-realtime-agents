@@ -260,7 +260,20 @@ function App() {
       },
     };
 
+
+
     sendClientEvent(sessionUpdateEvent);
+
+    // const event = {
+    //   type : "session.update",
+    //   session : {
+    //     instructions : 'Each time the user speaks, pay attetion to their pace and determine whether they are speaking at a slow, fast or moderate pace. In your response to the user, match their pace.'
+    //     //instructions : 'Speak to user very slow, like 10 words per second.'
+    //   }
+
+    // }
+
+    // sendClientEvent(event);
 
     if (shouldTriggerResponse) {
       sendSimulatedUserMessage("hi");
